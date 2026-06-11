@@ -41,8 +41,10 @@ def generate_alasan(penghasilan, usia, pekerjaan, kondisi_rumah, status):
         alasan.append({"icon": "✓", "teks": "Kondisi rumah buruk", "positif": True})
     elif kondisi_rumah == 1:
         alasan.append({"icon": "~", "teks": "Kondisi rumah sedang", "positif": None})
-    else:
+    elif kondisi_rumah == 2:
         alasan.append({"icon": "✗", "teks": "Kondisi rumah baik", "positif": False})
+    else:
+        alasan.append({"icon": "✗", "teks": "Kondisi rumah tidak dapat dianalisis", "positif": False})
 
     return alasan
 
@@ -56,11 +58,32 @@ def predict():
     pekerjaan     = data['pekerjaan']
     kondisi_rumah = data['kondisi_rumah']
 
+
+    # Jika kondisi rumah tidak terdeteksi, tolak langsung
+    if kondisi_rumah == 3:
+        return jsonify({
+            "status": "ditolak",
+            "skor": 0.05,
+            "alasan": [
+                {"icon": "✗", "teks": "Foto rumah tidak dapat dianalisis, silakan upload ulang", "positif": False}
+            ]
+        })
+
     fitur = [[penghasilan, usia, pekerjaan, kondisi_rumah]]
 
     prob = model.predict_proba(fitur)[0][1]
+
+    # Cap berdasarkan kondisi rumah
+    if kondisi_rumah == 2:      # rumah baik
+        prob = min(prob, 0.30)
+    elif kondisi_rumah == 1:    # rumah sedang
+        prob = min(prob, 0.70)
+    elif kondisi_rumah == 0:    # rumah buruk
+        prob = min(prob, 0.95)
+
     # Clamp selalu jalan
     prob = max(0.05, min(0.95, float(prob)))
+
 
     status = "diterima" if prob > 0.5 else "ditolak"
 
